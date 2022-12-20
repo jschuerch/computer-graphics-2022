@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Subsurface Scattering with Photon Beam Diffusion</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Dano Roost</li>
+                        </ol>
+                        <h2>Effect of the Feature</h2>
+                        <div class="row">
+                        <p>
+                            The effect of subsurface scattering (SSS) describes the bouncing of light inside a medium before leaving it again. 
+                            This leads to a "soft" looking material, like wax, milk or skin. While it is in theory possible to simulate this phenomenon by actual Monte Carlo path tracing (i.e. each scattering event is simulated), this approach is not feasible as it leads to very long render times. Instead we perform a so-called diffusion approximation.  
+
+                        </p>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 80%;">
+                                <img src="images/dano/sss/sss-header.png" alt="High Resolution PBD - 4096 ssp" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-nori-1024-disabled.png" alt="Disabled" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-nori-1024.png" alt="Enabled" class="img-responsive">
+                            </div>
+                        </div>
+                        <h2>Technical Implementation</h2>
+                        <p>
+                            <b>Overview</b><br/>
+                            For this project, we implement the approach of photon beam diffusion (PBD) by Habel et. al.
+                            For large parts, we follow the PBRT-v3 implementation which implements the same approach. We also report on how we deviate from PBRT in this report.
+
+                            The core of the implementation is a lookup table to store the intensity of the SSS as a function of the SSS-parameters and the radius from the incident/outgoing point.
+                            The table and the bulk of the implementation can be found in <code>src/bssrdf.cpp</code> and <code>include/nori/bssrdf.h</code>.
+                            As we cannot accurately reproduce the material setup of PBRT due to complex layering and Mitsuba does not provide an implementation of PBD, we try to qualitatively compare the effects of subsurface scattering using the closest equivalent material in Nori (dielectric).
+                            <br/>
+                            <br/>
+                            <b>Parametrization</b><br/>
+                            To avoid tedious parametrization over different scattering coefficents, we adapt the approach to define the mean free path and perform a inverse CDF lookup to find the corresponding SSS-parameters <code>sigma_s</code> and <code>sigma_a</code>. This implementation can be found in <code>subsurfaceFromDiffuse()</code> in <code>bssrdf.cpp</code>
+                            <br/>
+                            <br/>
+                            <b>Changes to the Path Tracing Process</b><br/>
+                            For path tracing with subsurface scattering, we have to heavily adjust the path tracing approach in order to prevent code duplication, as we are now performing multiple importance sampling in two different locations (at the entering intersection and the leaving intersection). We therefore extract the BSDF- and emitter sampling into a separate function <code>directMis</code>. To check, whether we the last bounce was a transmission <b>into</b> the material, we add the property <code>isTransmission</code> to the BSDFQueryRecord. In transmissive BSDFs like Dielectric, we set this property to true in case of a refraction.
+                            <br>
+                            <br>
+                            <b>Sampling Incoming Positions and Computing Intersections</b><br/>
+                            One place where we deviate from the PBRT implementation is the sampling of additional intersections. While PBRT does dynamically add new intersections to a list, we define a maximum for the number of intersections and only check that many times. In the current version, this maximum is set to 6. The core of the the photon beam diffusion is the sampling of a new point which corresponds to the location where a ray enters the object before leaving at the sample origin. A very nice visualization of the process of sampling the incoming point close to the outgoing point can be found in the <a href="https://www.pbr-book.org/3ed-2018/Light_Transport_II_Volume_Rendering/Sampling_Subsurface_Reflection_Functions">PBRT Book, Figure 15.11</a>. After sampling the incoming point (<code>pi</code>), we need to calculate the contribution of the subsurface scattering positional component. The nice thing about this approach is, that the sampling of the positional component can be performed independently and then multiplied. The influence of the sampled point <code>pi</code> is purely defined by the distance between the outgoing intersection (<code>its</code>) and the incoming intersection (<code>pi</code>). This evaluation is performed right after <code>pi</code> is sampled using the <code>eval_sp(pi,po)</code> function which performs a lookup in the table already described.
+                            <br/>
+                            <br/>
+                            <b>Sampling the Directional Component</b><br/>
+                            As said already is the directional and the positional SSS-component multiplicatively connected. To sample the directional component, we add an additional BSDF (<code>DirectionalSubsurface</code>) that is added to each object to the dirBSDF-field of each object. This new BSDF can be used for sampling the incoming direction. Both the the positional and the directional component are multiplied to the transmittance value <code>t</code> (beta in other implementations).
+                            <br/>
+                            <br/>
+                            <b>Lookup Table Interpolation</b><br/>
+                            For smoothly approximate the diffusion approximation, we describe a lookup table as described above. In order to not only get discrete measurements but a smooth interpolation, we use Catmull-Rom interpolation. As a manual implementation is error prone and would require large amounts of testing time, we decided to re-use the implementation provided by PBRT.
+                            <br/>
+                            <br/>
+                            <b>How to use BSSRDF in Nori</b><br/>
+                            To access the sampling procedure, we allow the user to attach a BSSRDF to a mesh in addition to the BSDF. This is different to PBRT which only allows for on or the other and automatically adds other BRDF-components based on the material properties. Our approach allows for more diverse variations and combinations of materials with subsurface interaction at the price of possible non-realistic behavior. An example on how to specify an object with BSSRDF and BRDF would be the following XML-snippet:
+                            <br/>
+                            <code>
+                                &#60;mesh type="obj"&#62;<br/>
+                                &emsp;&#60;string name="filename" value="fox_skull.obj"/&#62;                                  
+                                &emsp;&#60;bsdf type="dielectric"&#62;<br/>
+                                &emsp;&emsp;&#60;float name="extIOR" value="1"/&#62;<br/>
+                                &emsp;&emsp;&#60;float name="intIOR" value="1.33"/&#62;<br/>
+                                &emsp;&#60;/bsdf&#62;<br/>
+                                &emsp;&#60;bssrdf type="bssrdf"&#62;<br/>
+                                &emsp;&emsp;&#60;float name="meanFreePath" value="0.02"/&#62;<br/>
+                                &emsp;&emsp;&#60;float name="eta" value="1.33"/&#62;<br/>
+                                &emsp;&emsp;&#60;color name="albedo" value="0.2,0.1,0.1"/&#62;<br/>
+                                &emsp;&#60;/bssrdf&#62;<br/>
+                                &#60;/mesh>
+                            </code>
+                            <br/><br/>
+                            <b>Filling the Lookup Table</b><br/>
+                            The lookup table for the positional component of photon beam diffusion gets filled in <code>computeBeamDiffusionBSSRDF()</code> which invokes <code>beamDiffusionSS</code> and <code>beamDiffusionMS</code> (SS = single scattering, MS = multiple scattering).
+                            The code implements the approximation for the diffusion approximation discussed in the paper by Habel et. al.. It is very close to the PBRT version as the computation is relatively self-contained and doesn't touch on many aspects of the path tracer. While the parameter <code>g</code> can be used in theory to control the forward/backward scattering within the medium, the general assumption is that light bounces so many times that the resulting output is isotropic in nature (<a href="https://www.pbr-book.org/3ed-2018/Light_Transport_II_Volume_Rendering/Subsurface_Scattering_Using_the_Diffusion_Equation#">See Principle of Similarity, 15.5.1</a>).
+                            <br/>
+                            <br/>
+                        </p> 
+                        <h2>Validation</h2>
+                        <p>
+                            For validation, we set up a simple scene with a very detailed object with thin structures.
+                            We use the mesh from <a href="https://www.artec3d.com/3d-models/bat-eared-fox-skull">here</a> for demonstration purposes as it has intricate detail and varying levels of surface thickness. We would like to point out, that the implementation of the point light in PBRT-v3 differs from Nori, which results in a slight difference in lighting.
+                            We evaluate the scene using different subsurface scattering settings. 
+                            The validation scenes can be found under the following paths:
+                            <ul>
+                                <li>Nori: <code>cg-project-2022/verification/dof/doftest/dof_testscene.xml</code></li>
+                                <li>PBRT: <code>cg-project-2022/verification/dof/doftest/dof_testscene.pbrt</code></li>
+                            </ul>
+                            For performance reasons, the validation images are rendered with a resolution of only 512x512 pixel. For a high res version of the mesh, please refer to the image on top. 
+                            We use 1024 samples per image.
+                        </p>
+
+
+                        <h3>Comparison 0 - Enable / Disable SSS</h3>
+                        <p>First, we compare the render with and without subsurface scattering. One can easily recognize that the light skims though the thin parts, which is not the case of the diffuse-only version on the left.</p>
+                        <ul>
+                            <li>Mean free path: 0.2 m</li>
+                            <li>Albedo: 0.4,0.2,0.2</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-nori-1024-disabled.png" alt="Disabled" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-nori-1024.png" alt="Enabled" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <h3>Comparison 1 - Basic setup</h3>
+                        <p>Basic setup with a point light. The energy distribution is slightly different between PBRT and Nori, but it can be seen nicely that the subsurface scattering has a similar effect around thin parts of the mesh.</p>
+                        <ul>
+                            <li>Mean free path: 0.2 m</li>
+                            <li>Albedo: 0.4,0.2,0.2</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-pbrt-1024.png" alt="PBRT" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-nori-1024.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <h3>Comparison 2 - With Environment Light</h3>
+                        <p>When using an environment light emitter (see other feature) the discrepancy between the two approaches is larger. We suspect that this is caused by the additional materials added in the subsurface scattering case in PBRT. Our solution however looks plausible too and the importance sampling works well with very few exceptions. The subsurface scattering that is observable on the teeth and the nostrils still match the PBRT version.</p>
+                        <ul>
+                            <li>Mean free path: 0.2 m</li>
+                            <li>Albedo: 0.4,0.2,0.2</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-pbrt-1024-envmap-2.png" alt="PBRT" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-nori-1024-envmap-2.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <h3>Comparison 3 - Different Albedos</h3>
+                        <p>
+                            In this validation, we inspect the effect of different albedo values.
+                            One can clearly observe that attenuating effect of lower albedo/diffuse radiance has on the subsurface scattering.
+                        </p>
+                        <ul>
+                            <li>Mean free path: 0.2 m</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-a1.png" alt="(0.4,0.2,0.2)" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-a2.png" alt="(0.2,0.1,0.1)" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-a3.png" alt="(0.2,0.2,0.4)" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-a4.png" alt="(0.1,0.1,0.2)" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <h3>Comparison 3 - Different Mean Free Path Lengths</h3>
+                        <p>Here, we compare two different mean free path lengths in Nori. As expected, the longer the mean free path is, the more the light can travel through the object and the more prominent is the subsurface scattering.</p>
+                        <ul>
+                            <li>Albedo: 0.4,0.2,0.2</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/sss/simplescene-nori-1024.png" alt="MFP = 0.02" class="img-responsive">
+                                <img src="images/dano/sss/simplescene-nori-1024-mfp004.png" alt="MFP = 0.04" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/>
+                        <h2>Code Coordinates</h2>
+                        <p>
+                            The implementation touches many places of our path tracer. In the following, we list the most important ones with a short description on what the code does:
+                            <ul>
+                                <li><code>bssrdf.h/bssrdf.cpp</code> Header and code file with interfaces for the lookup table (<code>BSSRDFTable</code>), the <code>BSSRDF</code> base class, the <code>SeparableBSSRDF</code> and the <code>TabulatedBSSRDF</code> which is a BSSRDF-implementation that allows to use a lookup table. Finally, this file contains the definition of <code>NoriBSSRDF</code> and <code>DirectionalSubsurface</code>. The first one is made for interfacing with the path tracing components and simply invokes the functionality offered by <code>TabulatedBSSRDF</code>. The second one is a BSDF can be sampled to get an incoming direction for the subsurface scattering.</li>
+                                <li><code>interpolation.h/interpolation.cpp</code> As described above, adapted from PBRT. This file implements Catmull-Rom interpolation to interpolate values in the lookup table.</li>
+                                <li><code>path_mis.cpp</code> To accommodate for the added subsurface scattering, we changed the structure of path_mis to re-use the BSDF- and emitter sampling in multiple places. This has a great impact of the structure.</li>
+                                <li><b>Other</b> We also add an additional flags to the <code>BSDFQueryRecord</code>, <code>isTransmission</code> and two flags to the <code>Emitter.h</code>, <code>isDiffuse</code> and <code>isSpecular</code>. While the <code>isSpecular</code> could also be evaluated over the <code>BSDFQueryRecord.measure</code> field, this is a bit of a cleaner way to do it.
+                                    <li></li>
+                                </li>
+                            </ul>
+		<float name="fov" value="27.7856"/>
+		<float name="apertureRadius" value="0.01"/>
+		<float name="focusDistance" value="5"/>
+		<transform name="toWorld">
+			<scale value="-1,1,1"/>
+			<lookat target="0, 0.893051, 4.41198" origin="0, 0.919769, 5.41159" up="0, 1, 0"/>
+		</transform>
+
+		<integer name="height" value="512"/>
+		<integer name="width" value="512"/>
+	</camera>
+                            </ul>
+                        </p>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

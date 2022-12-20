@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <div class="sb-sidenav-menu-heading">Modeling Meshes</div>
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Modeling Meshes</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Jennifer Schürch</li>
+                        </ol>
+                        <p>To render our final scene, we need to model a couple of meshes. I used Blender to model these meshes and create the composition of the scene.</p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/blender_scene_wip.png" alt="preview" class="img-responsive"></div>
+                        <p>I modeled various objects including the pool, the jumping board, the pool ladder, the rifle, and the helmet. I attached some work in progress images below. For all objects I modeled, I start with a basic mesh (mostly the cube or sphere for the helmet) and use various tools in Blenders edit mode (extrude, scale, move, etc.) to shape the desired object. For the rifle, I added a reference image as a texture to a plane to have a reference in the scene. Then I just modeled the overall shape in 2D. Then I adjusted the other dimension as well to make it more realistic. I did not add too many details as it is not a focal point of the final scene, but enough details that it does not look low poly. For the handles of the board and ladder I use Bezier curves and added bevel depth to get these pipe shapes. Before exporting the models, I apply uv-unwrapping which is required for the use of textures.</p>
+                        <p>For the boy in swimming shorts, we found a nice model on <a href="https://www.blendswap.com/blend/28604" target="_blank">blendswap.com</a>. Here I used the provided rig to pose the character and modified the face in edit mode to remove the smile. The smoke in the background was taken from openvdb. The file is named <a href="https://www.openvdb.org/download/" target="_blank">explosion.vdb</a>.</p>
+                        
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/board.png" alt="pool WIP" class="img-responsive"></div>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/pool.png" alt="pool WIP" class="img-responsive"></div>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/rifle.png" alt="rifle WIP" class="img-responsive"></div>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/rig.png" alt="rigging" class="img-responsive"></div>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 600px" src="images/jenny/modeling/helmet.png" alt="rigging" class="img-responsive"></div>
+                        <br/><br/>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

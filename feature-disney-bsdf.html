@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <div class="sb-sidenav-menu-heading">Disney BSDF</div>
+                            <a class="nav-link" href="#implementation">Implementation</a>
+                            <a class="nav-link" href="#validation">Validation</a>
+                            <a class="nav-link" href="#additional_results">Validation - Additional Results</a>
+
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Disney BSDF</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Jennifer Schürch</li>
+                        </ol>
+                        <p>
+                            The feature "15.5 - Disney BSDF" adds a more advanced BSDF where we can use a set of parameters to customize the BSDF to produce a specific output. The graded 5 parameters are metallic, specular, roughness, sheen and sheen tint. However, I decided to add specular tint, subsurface, clearcoat and clearcoat gloss as well.
+                        </p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 700px" src="images/jenny/disney/metallic.png" alt="preview" class="img-responsive"></div>
+                        <br/><br/>
+                        <h2 id="implementation">Implementation</h2>
+                        <p>
+                            For the implementation of this feature, I mostly followed the contents of the <a href="https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf" target="_blank">paper</a> and the corresponding reference implementation by Walt Disney Animation Studios of the <a href="https://github.com/wdas/brdf/blob/main/src/brdfs/disney.brdf" target="_blank">BRDF explorer</a>.
+                        </p>
+                        <p>
+                            In the <code>eval</code> method, we evaluate the BSDF for the two given directions <code>wo</code> and <code>wi</code>. I decided to implement 9 parameters, metallic, specular, specular tint, roughness, sheen, sheen tint, subsurface, clearcoat and clearcoat gloss. The eval method calculates three different terms, the diffuse term, specular term and the clearcoat term. The parameters that contribute to the diffuse term are the base color, metallic, subsurface, sheen and sheen tint. Using the Schlick Fresnel weights, described in the paper, we can linearly interpolate between the different contributions. For the specular term and the clearcoat term, we need to use the Generalized Trowbridge-Reitz distribution (GTR) to describe the specular lobe. For the specularity we use GTR2 and for the clearcoat we use GTR1. Both of these distributions have been implemented in the <code>warp</code> class, as we need to be able to get the respective PDF and sample according to the distribution. For the sampling and the pdf for GTR1 and GTR2 I consulted the implementation of PBRT-v3. The pdf is essentially cosine-weighted version of the GTR1/2 methods, and the warp test shows that my sampling and pdf methods are matching. For the sampling of the different parts (diffuse, specular and clearcoat) I use a heuristic to decide the probability thresholds using the defined parameters. I have not found which probabilities are generally used. Therefore, I experimented with a few different options and chose the ones that produced results which are close to Mitsuba.
+                        </p>
+                        <p>
+                            As I already implemented the Images as Textures feature, I decided to provide the ability to use a specular and roughness map using an image for the specular and roughness parameters.  
+                        </p>
+                        <p>Usage:</p>
+                        <p><code>&#60;bsdf type="disney"&#62; <br>
+                            &emsp;&#60;texture type=".." name="albedo"&#62; ... &#60;/texture&#62;<br>
+                            &emsp;&#60;color name="basecolor" value="0.012 0.239 0.282"&#62;<br>
+                            &emsp;&#60;float name="metallic" value="0.0"/&#62;<br>
+                            &emsp;&#60;texture type="image_texture" name="specular"&#62; ... &#60;/texture&#62;<br>
+                            &emsp;&#60;float name="specular" value="0.5"/&#62;<br>
+                            &emsp;&#60;float name="specularTint" value="0.0"/&#62;<br>
+                            &emsp;&#60;texture type="image_texture" name="roughness"&#62; ... &#60;/texture&#62;<br>
+                            &emsp;&#60;float name="roughness" value="0.5"/&#62;<br>
+                            &emsp;&#60;float name="sheen" value="0.0"/&#62;<br>
+                            &emsp;&#60;float name="sheenTint" value="0.5"/&#62;<br>
+                            &emsp;&#60;float name="subsurface" value="0.0"/&#62;<br>
+                            &emsp;&#60;float name="clearcoat" value="0.0"/&#62;<br>
+                            &emsp;&#60;float name="clearcoatGloss" value="1.0"/&#62;<br>
+                            &#60;/bsdf&#62;<br>
+                        </code></p>
+                        <p>The following files have been modified or added to implement this feature:</p>
+                        <ul>
+                            <li>src/disney.cpp</li>
+                            <li>include/nori/warp.h</li>
+                            <li>src/warp.cpp</li>
+                            <li>src/warptest.cpp</li>
+                        </ul>
+
+                        <h2 id="validation">Validation</h2>
+                        <p>
+                            To validate the textures, I rendered spheres in Nori and Mitsuba using the direct and path integrator to see whether I get the same results when using the same parameters.
+                        </p>
+                        
+                        <h3>Comparison to Mistuba - Direct Integrator</h3>
+                        <p>For each parameter, I generate several spheres where all parameters except 1 are the same.</p>
+                        <h5>Diffuse - Path - Brightness difference</h5>
+                        <p>I would like to remark here that for the path integrator, our version is slightly brighter than Mitsubas version, which only happens when using point lights. This has nothing to do with this feature and therefore I will ignore it in the comparisons below. Here is a side-by-side comparison of a diffuse surface using path_mis:</p>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 60%; padding: 0;">
+                                <img src="images/jenny/disney/diffuse.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-diffuse.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br><br>
+                        <p>All parameters except the lower roughness values produce good results which also match with Mitsuba. However, my results seem to be slightly more noisy than Mitsubas results. For low roughness values, I assume that the sampling probabilities are not ideal. I was not able to figure out how to fix it. Additionally, we can also see some differences in the clearcoat parameters. However, as clearcoat is a non-graded parameter and because of time issues, I did not further investigate how to fix that.</p>
+                        <br>
+                        <h4>Metallic - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/metallic-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-metallic-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Metallic - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/metallic.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-metallic.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Specular - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/specular-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-specular-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Specular - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/specular.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-specular.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Specular Tint (not graded) - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/specularTint-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-specularTint-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Specular Tint (not graded)  - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/specularTint.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-specularTint.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Roughness - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/roughness-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-roughness-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Roughness - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/roughness.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-roughness.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Sheen - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheen-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheen-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Sheen - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheen.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheen.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <p>The difference of the sheen parameter is very subtle. Therefore, I provide additional comparisons between sheen 0 and sheen 1.</p>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheen_0.png" alt="Sheen 0 - Mine" class="img-responsive">
+                                <img src="images/jenny/disney/sheen_1.png" alt="Sheen 1 - Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheen_0.png" alt="Sheen 0 - Mitsuba" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheen_1.png" alt="Sheen 1 - Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Sheen Tint - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheenTint-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheenTint-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Sheen Tint - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheenTint.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheenTint.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <p>The difference of the sheenTint parameter is also very subtle. Therefore, I provide additional comparisons between sheenTint 0 and sheenTint 1.</p>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/sheenTint_0.png" alt="SheenTint 0 - Mine" class="img-responsive">
+                                <img src="images/jenny/disney/sheenTint_1.png" alt="SheenTint 1 - Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheenTint_0.png" alt="SheenTint 0 - Mitsuba" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-sheenTint_1.png" alt="SheenTint 1 - Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Subsurface (not graded) - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/subsurface-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-subsurface-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Subsurface (not graded) - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/subsurface.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-subsurface.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Clearcoat (not graded) - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/clearcoat-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-clearcoat-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Clearcoat (not graded) - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/clearcoat.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-clearcoat.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Clearcoat Gloss (not graded) - Direct</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/clearcoatGloss-direct.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-clearcoatGloss-direct.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Clearcoat Gloss (not graded) - Path</h4>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 100%;padding: 0;">
+                                <img src="images/jenny/disney/clearcoatGloss.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/disney/mitsuba-clearcoatGloss.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <br/><br/>
+                        <h3 id="additional_results">Additional Results</h3>
+                        <h4>Roughness Map</h4>
+                        <p>Here I added to a metallic plane a roughness map with this brick texture. I did not do a side-by-side comparison with Mitsuba, but the result looks similar to the render in Blender (see screenshot below the comparison).</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/disney/roughness_map.png" alt="Roughness" class="img-responsive">
+                                <img src="images/jenny/disney/roughness_map_texture_only.png" alt="Texture" class="img-responsive">
+                                <img src="images/jenny/disney/roughness_map_texture.png" alt="Roughness and Texture" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h5>Roughness Map applied to plane using Blender</h5>
+                        <div style="text-align: center;">
+                        <img style="max-width: 100%; width: 300px;" src="images/jenny/disney/roughness_map_blender_preview.png" alt="Blender - Roughness" class="img-responsive">
+                        </div>
+                        
+                        <h4>Resources</h4>
+                        <p>The brick wall texture and roughness map are from <a href="https://3dtextures.me/2020/06/05/brick-wall-018/" target="_blank">here</a>. </p>
+                        <div class="row" >
+                            <img style="width: 100%; max-width: 300px" src="images/jenny/disney/brick_wall_roughness.png" alt="normal map example scene" class="img-responsive">
+                        </div>
+                        
+                        <br/><br/>
+                        <h3>Warptest</h3>
+                        <p>Here are some screenshots showing that GTR1 and GTR2 pass the provided warptest.</p>
+                        <h4>GTR1</h4>
+                        <div style="text-align: center;">
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR1.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        <br>alpha = 0.1 <br>
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR1_0.1.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        <br>alpha = 0.9 <br>
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR1_0.9.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        </div>
+                        <h4>GTR2</h4>
+                        <div style="text-align: center;">
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR2.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        <br>alpha = 0.1 <br>
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR2_0.1.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        <br>alpha = 0.9 <br>
+                        <img style="max-width: 100%; width: 500px;" src="images/jenny/gtr/GTR2_0.9.png" alt="Blender - Roughness" class="img-responsive"> <br>
+                        </div>
+                        <br>
+                        <br>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

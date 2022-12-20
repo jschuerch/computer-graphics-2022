@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <div class="sb-sidenav-menu-heading">Heterogeneous Participating Media</div>
+                            <a class="nav-link" href="#implementation">Implementation</a>
+                            <a class="nav-link" href="#validation">Validation</a>
+                            <a class="nav-link" href="#validation_media">Validation - Media</a>
+                            <a class="nav-link" href="#additional_results_media">Validation - Media - Additional Results</a>
+                            <a class="nav-link" href="#validation_phase">Validation - Phase Function</a>
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Heterogeneous Volumetric Participating Media</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Jennifer Schürch</li>
+                        </ol>
+                        <p>
+                            The feature "30.1 - Heterogeneous Volumetric Participating Media" allows us to render participating media such as smoke and fog. I provide three different types of media, homogeneous, exponential density and heterogeneous using openvdb files.
+                        </p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 700px" src="images/jenny/pm/cbox_bunny.png" alt="preview" class="img-responsive"></div>
+                        <br/><br/>
+                        <h2 id="implementation">Implementation</h2>
+                        <p>
+                            For the implementation of this feature, I tried to follow the description from the PBR book and its implementation as well as the implementation of Mitsuba.
+                        </p>
+                        <p>
+                            To implement this feature, we need: a <code>Medium</code> class which can sample a new free path inside the medium and calculate the transmittance along a ray, a <code>Phase Function</code> class which samples a new direction for the scattering inside of the function, a new <code>Volumetric Path Integrator</code> to be able to handle media in the scene. Additionally, the <code>scene</code> class has been extended to enable the registration of multiple media in the scene, and to return a random media and the closest medium to the ray. 
+                        </p>
+                        <h4>Phase Function</h4>
+                        <p>
+                            For the <code>PhaseFunction</code> I implemented an isotropic phase function, which simply samples uniformly in all directions and I also implemented the Henyey-Greenstein phase function which has a parameter g, and for g=0 it behaves like the isotropic phase function, for g > 0 it mostly scatters forward, and for g < 0 it mostly scatters backward. 
+                        </p>
+                        <h4>Medium</h4>
+                        <p>
+                            For the <code>Medium</code> class, there are two main methods <code>Tr</code> to calculate the transmittance along the ray and <code>sample</code> to sample a free path. In the beginning I had a simplified implementation for the homogeneous medium, however, the result deviated greatly from Mitsuba, so I decided to the delta tracking algorithm for all media types. The idea here is to start at the beginning of the ray, and progress along the ray with random step size to avoid artifacts. For the <code>sample</code> method we continue along the ray until we either exit the medium, or if density / max_density is bigger than a random number. In the latter case, we have found a medium interaction, which will then be handled by the integrator. In the <code>Tr</code> method, we continue along the ray until we exit the medium (or reach the end of the ray) to calculate the transmittance. PBRT also includes Russian roulette in case the transmission gets low. Therefore, I also added the Russian roulette termination criteria. The parameters describing our media are the absorption and scattering coefficients, <code>sigma_a</code> and <code>sigma_s</code>, and the maximum density. The attenuation coefficient <code>simga_t</code> can be calculated by adding <code>sigma_a</code> and <code>simga_s</code>. The <code>albedo</code> is calculated by dividing <code>sigma_s</code> by <code>sigma_t</code> and is therefore always between 0 and 1.
+                        </p>
+                        <p>
+                            The main difference between <code>Heterogeneous</code>, <code>ExponentialDensity</code> and <code>Homogeneous</code> medium is the density function. For the homogeneous case, we simply use the max_density parameter which can be defined in the xml. For the exponential density case, we use an exponential function <code>max_density * exp(-b * height)</code> to slowly decrease the density in the up-direction. Both the up direction and the b in the exponent can be defined in the xml. This creates a nice foggy scene. Lastly, for the heterogeneous case, I wanted to be able to read cloud data from openvdb files and render these media. The files I have looked at generally only contain density grid information. Therefore, in my implementation, we read the corresponding density from the file in the <code>getDenstiy</code> method. All three media types use a bounding box to decide where the participating media should be rendered. For the heterogeneous medium we can define a bounding box where the medium should be placed, and then we map this bounding box to the bounding box from the openvdb file. I do this by first mapping the bounding box to a unit cube and then mapping the unit cube to the VDB bounding box. To be able to control how dense the VDB medium is rendered, I added the <code>density_scale</code> parameter.  
+                        </p>
+                        <h4>Volumetric Path Integrator</h4>
+                        <p>
+                            Lastly, we need to implement a volumetric path tracer to enable the medium to be rendered. I start by extending the path_mis implementation from previous assignments. For each ray, I start by looping over all media. For each medium I sample a new path inside of it. If we detect a medium interaction, we randomly sample an emitter to check whether it is visible from the medium interaction point. If so, we add the contribution of the light together with the medium transmittance along the shadow ray. The next ray is sampled by using the phase function, where we check whether the newly intersected point is an emitter and recalculate the w_mat weight similar to the surface interaction case in the path_mis integrator. In case of no medium interactions, we check for a surface interaction. This case is basically the same as the implementation in path_mis, with the difference that we always multiply with the calculated transmittance of the medium along the ray. In case the scene contains more than one medium, I loop over all media and multiply transmittance together. 
+                        </p>
+                        <p>
+                            Initially, I implemented this integrator without looping over all media. However, then as soon as I added more than one medium to the scene, the different media started to fade. Always choosing the closest medium also did not work properly for the shadows the media were casting. Additionally, when we have intersecting media, choosing the closest one also does not work properly. 
+                        </p>
+                        <p>
+                            As my project partner implemented subsurface scattering, and also had to adapt the path_mis implementation to work properly for his feature, I have created a second volumetric path integrator called <code>volpath_sss</code>. I managed to somewhat merge our two implementations together. However, as I did not have time to test and evaluate this integrator properly.
+                        </p>
+                        <p>Usage:</p>
+                        <p><code>&#60;medium type="heterogeneous|exponential_density|homogeneous"&#62; <br>
+                            &emsp;&#60;phase type="henyey|iso"&#62;&#60;float name="g" value="0"/&#62;&#60;/phase&#62;<br>
+                            &emsp;&#60;color name="sigma_a" value="1 1 1"/&#62;<br>
+                            &emsp;&#60;color name="sigma_s" value="2 2 2"/&#62;<br>
+                            &emsp;&#60;float name="max_density" value="1"/&#62;<br>
+                            &emsp;&#60;vector name="origin" value="0.0 0.0 0.0"/&#62;<br>
+                            &emsp;&#60;vector name="size" value = "2 2 2"/&#62;<br>
+                            ... <br>
+                            &#60;/bsdf&#62;<br>
+                            <br>
+                        </code>
+                        Additional Tags for exponential density:<br>
+                        <code>
+                            &emsp;&#60;vector name="up" value="0 1 0"/&#62;<br>
+                            &emsp;&#60;float name="expon_b" value="2"/&#62;<br>
+                        </code><br>
+                        Additional Tags for heterogeneous:<br>
+                        <code>
+                            &emsp;&#60;string name="vdb" value="meshes/file.vdb"/&#62; <br>
+                            &emsp;&#60;float name="density_scale" value="1"/&#62;<br>
+                        </code>
+                        </p>
+                        <p>The following files have been modified or added to implement this feature:</p>
+                        <ul>
+                            <li>include/medium.h</li>
+                            <li>src/medium.cpp</li>
+                            <li>src/homogeneous.cpp</li>
+                            <li>src/exponentialDensity.cpp</li>
+                            <li>src/heterogeneous.cpp</li>
+                            <li>src/volpath.cpp</li>
+                            <li>src/volpath_sss.cpp</li>
+                            <li>include/nori/scene.h</li>
+                            <li>src/scene.cpp</li>
+                            <li>include/nori/common.h</li>
+                        </ul>
+
+                        <h2 id="validation">Validation</h2>
+                        <p>
+                            For the validation of the homogeneous participating media, I used Mitsuba and could achieve almost identical results. For the exponential density, I simply compare it with the homogeneous version, as the basic idea is to have thicker fog below and slowly fading fog in the up direction.
+                        </p> 
+                        <p>
+                            I was planning on validating my heterogeneous participating media result with Mitsuba as well, however, Mitsuba uses their own <code>.vol</code> file type and not openvdb. They provide a <a href="https://github.com/mitsuba-renderer/mitsuba2-vdb-converter" target="_blank">mitsuba2 vdb converter</a> to be able to convert openvdb to .vol files. However, neither me nor my project partner managed to get this converter running. Therefore, I ended up validating my version by checking whether the expected shape is rendered and that the parameters act as expected.
+                        </p>
+                        <p>
+                            As for the volumetric path tracer, I validated that it produces the same results as path_mis when there are no media in the scene. The following two sections describe the validations for media and phase function.
+                        </p>
+                        
+                        <h2 id="validation_media">Validation - Media</h2>
+                        <h3>Comparison to Mitsuba - Homogeneous Medium</h3>
+                        <p>Here we can see that my homogeneous medium is almost identical to the result of Mitsuba.</p>
+                        <ul>
+                            <li>
+                                Medium 1:
+                                <ul>
+                                    <li>sigma_a: 1,1,1</li>
+                                    <li>sigma_s: 2,2,2</li>
+                                    <li>max_density: 1</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Medium 2:
+                                <ul>
+                                    <li>sigma_a: 1,1,1</li>
+                                    <li>sigma_s: 1,1,1</li>
+                                    <li>max_density: 1</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 60%; padding: 0;">
+                                <img src="images/jenny/pm/cbox_homogeneous_box.png" alt="Mine - Medium 1" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-cbox_homogeneous_box.png" alt="Mitsuba - Medium 1" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_homogeneous_box_2.png" alt="Mine - Medium 2" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-cbox_homogeneous_box_2.png" alt="Mitsuba - Medium 2" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <p>As the albedo is <code>sigma_s / (simga_a + sigma_s)</code>, choosing <code>sigma_s</code> to be smaller than <code>sigma_a</code> will result in darker a medium.</p>
+                        <ul>
+                            <li>sigma_a: 2,2,2</li>
+                            <li>sigma_s: 0.5,0.5,0.5</li>
+                            <li>max_density: 1</li>
+                        </ul>
+                        <div class="row" style="padding: 0;">
+                            <div class="twentytwenty-container" style="width: 60%; padding: 0;">
+                                <img src="images/jenny/pm/cbox_homogeneous_box_3.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-cbox_homogeneous_box_3.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <p>I would have liked to compare colored homogeneous media to Mitsubas implementation. However, Mitsuba only provides access to simga_t and albedo, and in case sigma_t should have 3 different values, we are restricted to values between 0 and 1 because of the datatype. Therefore, I was not able to produce meaningful results that could be compared with my implementation. </p>
+                        <br/><br/>
+                        <h3 id="additional_results_media">Additional Results</h3>
+                        <h4>Exponential Density</h4>
+                        <p>In the following comparison, you can see the effects that can be achieved when using exponential density instead of homogeneous. I show how the b-parameter can control the density fall off and how the "up"-direction controls the fall-off direction.</p>
+                        <ul>
+                            <li>
+                                For all media, we use the same simga_a, simga_s and max_density:
+                                <ul>
+                                    <li>sigma_a: 2,2,2</li>
+                                    <li>sigma_s: 1,1,1</li>
+                                    <li>max_density: 1</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Exponential Right:
+                                <ul>
+                                    <li>up: 1,0,0</li>
+                                    <li>expon_b: 2</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Exponential Up 1:
+                                <ul>
+                                    <li>up: 0,1,0</li>
+                                    <li>expon_b: 2</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Exponential Up 2:
+                                <ul>
+                                    <li>up: 0,1,0</li>
+                                    <li>expon_b: 5</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/cbox_homogeneous_box.png" alt="Homogeneous" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_exponential_density_box_right.png" alt="Exponential Right" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_exponential_density_box.png" alt="Exponential Up 1" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_exponential_density_box_b_5.png" alt="Exponential Up 2" class="img-responsive">
+                            </div>
+                        </div>
+
+                        <p>Foggy scenes can be simulated by expanding the bounding box size to encompass the whole cornell box. </p>
+                        <ul>
+                            <li>sigma_a: 2 2 2</li>
+                            <li>sigma_s: 1 1 1</li>
+                            <li>max_density: 1</li></color>
+                            <li>up: 0,1,0</li>
+                            <li>expon_b: 10</li>
+                        </ul>
+
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/cbox_2_spheres.png" alt="No Media" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_exponential_density.png" alt="Exponential Density" class="img-responsive">
+                            </div>
+                        </div>
+                        
+                        <br>
+                        <h4>Heterogeneous Media</h4>
+                        <p>
+                            My implementation can successfully render the expected bunny cloud shape. I additionally show a comparison of the rendering with and without fog.
+                        </p>
+                        <ul>
+                            <li>
+                                Bunny:
+                                <ul>
+                                    <li>sigma_a: 2.5,2.5,2.5</li>
+                                    <li>sigma_s: 0.5,0.5,0.5</li>
+                                    <li>density_scale: 15</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/cbox_bunny.png" alt="Without fog" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_bunny_foggy.png" alt="With fog" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <p>Here are some additional renderings of smoke, with different parameters.</p>
+                        <ul>
+                            <li>
+                                Light:
+                                <ul>
+                                    <li>sigma_a: 1,1,1</li>
+                                    <li>sigma_s: 2,2,2</li>
+                                    <li>density_scale: 10</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Dark:
+                                <ul>
+                                    <li>sigma_a: 2.5,2.5,2.5</li>
+                                    <li>sigma_s: 0.5,0.5,0.5</li>
+                                    <li>density_scale: 10</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Green:
+                                <ul>
+                                    <li>sigma_a: 1,1,1</li>
+                                    <li>sigma_s: 0.5 2 0.5</li>
+                                    <li>density_scale: 10</li>
+                                </ul>
+                            </li>
+                            <li>
+                                Blue:
+                                <ul>
+                                    <li>sigma_a: 3,3,3</li>
+                                    <li>sigma_s: 0.5 0.5 2</li>
+                                    <li>density_scale: 100</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/het_explosion_light.png" alt="Smoke - Light" class="img-responsive">
+                                <img src="images/jenny/pm/het_explosion.png" alt="Smoke - Dark" class="img-responsive">
+                                <img src="images/jenny/pm/het_explosion_green.png" alt="Smoke - Green" class="img-responsive">
+                                <img src="images/jenny/pm/het_explosion_blue.png" alt="Smoke - Blue" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h4>Multiple mediums</h4>
+                        <p>Here I show that adding multiple mediums produces the same medium rendering as if only one medium was added, and that we can have overlapping mediums as well.</p>
+                        <ul>
+                            <li>Green cube (left): <ul><li>Homogeneous</li><li>sigma_a: 1,1,1</li><li>sigma_s: 1,2,1</li><li>max_density: 0.5</li></ul></li>
+                            <li>Red cube (right): <ul><li>Homogeneous</li><li>sigma_a: 1,1,1</li><li>sigma_s: 2,1,1</li><li>max_density: 1</li></ul></li>
+                            <li>Exponential Density: <ul><li>sigma_a: 2,2,2</li><li>sigma_s: 1,1,1</li><li>max_density: 1</li><li>up: 0 1 0</li><li>expon_b: 10</li></ul></li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/cbox_multiple_1cube.png" alt="1 homogeneous medium" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_multiple_2cube.png" alt="2 homogeneous media" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_multiple_expon.png" alt="Exponential density" class="img-responsive">
+                                <img src="images/jenny/pm/cbox_multiple_all.png" alt="All 3 media" class="img-responsive">
+                            </div>
+                        </div>
+                        <br><br>
+                        
+                        <h2 id="validation_phase">Validation - Phase Function</h2>
+                        <p>I have implemented the isotropic and Henyey-Greenstein phase function. Both of these have also been implemented in Mitsuba. Therefore, I compare the homogeneous medium with different parameters for these functions.</p>
+                        <h3>Isotropic and Henyey-Greenstein with g = 0</h3>
+                        <p>Isotropic and Henyey-Greenstein with g = 0 should behave the same, as both versions just scatter the light isotropically. This can be observed in the following 4-way comparison.</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/phase_iso.png" alt="Isotropic - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-phase_iso.png" alt="Isotropic - Mitsuba" class="img-responsive">
+                                <img src="images/jenny/pm/phase_henyey_0.png" alt="Henyey (g=0) - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-phase_henyey_0.png" alt="Henyey (g=0) - Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br>
+                        <h3>Henyey-Greenstein - Forward and Backward scattering</h3>
+                        <p>Here I have a bug in my code and I was not able to figure out where. As far as I can tell, the implementation is basically identical to PBRT's implementation. However, both for g &#62; 0 and g &#60; 0 the medium gets brighter in my implementation. When I now use the slightly different formulas from Mitsuba my medium gets darker for |g| &#62; 0. And even then, both results don't match Mitsuba's result. I included two different Henyey-Greenstein implementations, one can be included in the xml with the keyword 'henyey' which matches the implementation of PBRT and the other can be included with the keyword 'henyey_m' which uses Mitsuba's version. I assume that the actual error is not in the phase function implementation, however I did not figure it out in time. Below I show the results for the two different wrong versions. </p>
+                        <h5>g = 0.7</h5>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/phase_henyey_0.7.png" alt="henyey - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/phase_henyey_m_0.7.png" alt="henyey_m - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-phase_henyey_0.7.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <h5>g = -0.7</h5>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/pm/phase_henyey_-0.7.png" alt="henyey - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/phase_henyey_m_-0.7.png" alt="henyey_m - Mine" class="img-responsive">
+                                <img src="images/jenny/pm/mitsuba-phase_henyey_-0.7.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

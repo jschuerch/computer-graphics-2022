@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <div class="sb-sidenav-menu-heading">Normal Mapping</div>
+                            <a class="nav-link" href="#implementation">Implementation</a>
+                            <a class="nav-link" href="#validation">Validation</a>
+                            <a class="nav-link" href="#additional_results">Validation - Additional Results</a>
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Normal Mapping</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Jennifer Schürch</li>
+                        </ol>
+                        <p>This feature "5.8 Bump Mapping or Normal Mapping" enables the user to fake bumpy surfaces with relatively low computation costs. I decided to implement Normal Mapping, which essentially perturbates the surface normal to create shadows on smooth surfaces and in combination with image textures can produce more realistic results.</p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 300px" src="images/jenny/nm/sphere_normal_only.png" alt="preview" class="img-responsive"></div>
+                        <br/><br/>
+                        <h2 id="implementation">Implementation</h2>
+                        <p>
+                            The basic structure of this class is the same as the checkerboard.cpp implementation. The overall implementation is the same as for Images as Textures. Therefore, the report text will be very similar. Some information will be repeated. First, we again need to be able to load the png image into Nori. For this, I used a preexisting png-loader called <a href="https://github.com/lvandeve/lodepng" target="_blank">lodepng</a>. Lodepng reads the image and saves the content into an unsigned char vector. One pixel is represented by a block of 4 chars with the respective <code>RGBA</code> values. This is implemented in the constructor of this class. Additionally, similar to the image texture feature, I added the ability to scale the normal map with a simple 2D vector. I use the same convention as in Blender for the scaling, e.g., if the scale value is 2, the normal map will be repeated twice for each axis.
+                        </p>
+                        <p>
+                            In the <code>eval</code> method, the uv coordinates are mapped to the image space. I assume that the uv coordinates are always scaled to [0,1]. We can simply calculate the image-u by multiplying uv.x() with the image width and the scaling term. Image-v is calculated analogously. After u and v have been mapped to the image space, we need to calculate the corresponding index in the image vector: <code>idx = (v * image_width + u) * 4</code>. The index is multiplied by 4 because each pixel consists of 4 chars (RGBA). To ensure the texture can be repeated, the index is mapped to the vector length by using the modulo operator: <code>idx = idx % image_size</code>. 
+                            Up until here, the implementation is basically the same as the images as texture feature. After obtaining the RGB values which are mapped from 0 to 255, we need to extract the normal. To this end, we again divide the RGB values by 255 to map them to [0,1]. Finally, since normals have to be mapped to [-1,1] we multiply each value by 2 and subtract 1 to get the desired normal. Since Nori has a left-handed coordinate system, we now need to switch the first and second coefficients of the normal and negate them: <code>new_normal = Vector3f(-y,-x,z)</code>.
+                        </p>
+                        <p>
+                            During the validation of this feature, I discovered that there are actually two different format types for bump maps, namely OpenGL and DirectX. For the brick wall example, which is shown below, I thought my implementation was wrong, because I felt like the bricks should stick out instead of in. However, Mitsuba produces the same output, therefore I added a flag "opengl" to my code, where you can switch between the different formats.</p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 300px" src="images/jenny/nm/opengl_vs_directx.png" alt="preview" class="img-responsive"></div>
+                        <br>
+                        <h4>BSDFs and Shapes</h4>
+                        <p>
+                            Next, we have to change the implementation of BSDFs and Shapes to enable the perturbation of the surface normals. I decided to add compatibility for the Mesh objects and Diffuse and Disney BSDFs. Other subclasses can be extended if needed.
+                        </p>
+                        <h5>BSDFs</h5>
+                        <p>
+                            For BSDFs, we need to edit the <code>addChild</code> method to allow normal maps to be added. This is analogous to the albedo. Furthermore, we need to be able to know whether the BSDF contains a normal map and if so, get access to the new normals. To this end, I provide the method <code>getNormalMap(Texture&#60;Normal3f&#62;* &normalmap)</code> which returns whether the normal map is set and then fills the normal map parameter. At the moment, normal maps are supported for Diffuse surfaces and Disney BSDFs.</p>
+                        <h5>Mesh</h5>
+                        <p>
+                            The most important and most complicated part is inside the Mesh class, where we have to compute a new shading frame from the normal map. All modifications happen in the method <code>setHitInformation</code>. The essential functionality here is, to first check whether the BSDF contains a normal map and if so, read the corresponding normal and transform the normal to world coordinates and creating a new shading frame: <code>its.shFrame = Frame(its.shFrame.toWorld(normal));</code> where the previous shFrame already has been initialized with the geoFrame or the interpolated shading frame. However, only doing this does not allow us to rotate the object and get the correct lighting information, since the shading frame tangents are not continuous. Therefore, I compute the shading frame first using the UV coordinates, if they are provided. If we have uv coordinates, we can first approximate the dp/du term and then using this, create our new shading frame where the u-tangent should be continuous. </p>
+                        <p>Usage:</p>
+                        <p><code>&#60;bsdf type="..."&#62; <br>
+                            &emsp;&#60;texture type="normal_map" name="normal"&#62;<br>
+                            &emsp;&emsp;&#60;string name="filename" value="normal_map.png"/&#62;<br>
+                            &emsp;&emsp;&#60;vector name="scale" value="1,1"/&#62;<br>
+                            &emsp;&#60;/texture&#62;<br>
+                            &#60;/bsdf&#62;<br>
+                        </code></p>
+                        <p>The following files have been modified or added to implement this feature:</p>
+                        <ul>
+                            <li>include/nori/lodepng.h</li>
+                            <li>src/lodepng.cpp</li>
+                            <li>src/normalmap.cpp</li>
+                            <li>include/nori/bsdf.h</li>
+                            <li>src/diffuse.cpp</li>
+                            <li>src/disney.cpp</li>
+                            <li>src/mesh.cpp</li>
+                        </ul>
+
+                        <h2 id="validation">Validation</h2>
+                        <p>
+                            To validate the textures, I rendered normal maps onto different objects, and compared the results to the same scene rendered by Mitsuba and Blender.  
+                        </p>
+                        <p>The sources of the normal maps: <a href="https://en.wikipedia.org/wiki/Normal_mapping" target="_blank">Wikipedia example scene</a>, <a href="https://3dtextures.me/2020/06/05/brick-wall-018/" target="_blank">Brick wall</a> </p>
+                        <div class="row" >
+                            <img style="width: 100%; max-width: 300px" src="images/jenny/nm/normal_map_example.png" alt="normal map example scene" class="img-responsive"> <img style="width: 100%; max-width: 300px" src="images/jenny/nm/brick_wall_normal.png" alt="normal map example scene" class="img-responsive">
+                        </div>
+                        
+                        <br/><br/>
+                        <h3>Comparison to Mistuba</h3>
+                        <p>First, I'm going to show comparisons with Mitsuba to show that the expected output is produced for the mapping and the colors. Similar to the texture as images feature, Mitsuba's version is a little bit sharper in comparison, but the overall result is almost identical.</p>
+                        <h4>Example Scene</h4>
+                        <ul>
+                            <li>No Rotation</li>
+                            <li>Light position: upper left</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/nm/example-scene.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/nm/mitsuba-example-scene.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <ul>
+                            <li>90° Rotation</li>
+                            <li>Light position: upper left (closer on the y-axis than previous example)</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/nm/example-scene-rotated.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/nm/mitsuba-example-scene-rotated.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <h4>Sphere</h4>
+                        <p>Applying normal maps on spherical objects also produces the same result as rendering it with Mitsuba.</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/nm/sphere_normal_only_noscale.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/nm/mitsuba-sphere-normal-only.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/><br/>
+
+                        <h3 id="additional_results">Additional Results</h3>
+                        <h4>Scale Effect</h4>
+                        <ul>
+                            <li>Light position: top center</li>
+                            <li>uv-scale: (2, 1)</li>
+                        </ul>
+                        <div style="text-align: center;">
+                            <img style="max-width: 100%; width: 500px; display: inline;" src="images/jenny/nm/example-scene-scale.png" alt="Scaled" class="img-responsive">
+                        </div>
+                        <h4>Image Texture with and without normal map</h4>
+                        <p>Here we can see the subtle differences when we apply normal maps in addition to textures. Applying the same scaling term on both texture and normal map produces consistent results. In this last example, I set the "opengl" flag to false, since I wanted the bricks to bump out instead of in.</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/nm/sphere.png" alt="None" class="img-responsive">
+                                <img src="images/jenny/nm/sphere_normal_only.png" alt="Normal Map" class="img-responsive">
+                                <img src="images/jenny/nm/sphere_texture_only.png" alt="Texture" class="img-responsive">
+                                <img src="images/jenny/nm/sphere_texture_normal.png" alt="Normal and Texture" class="img-responsive">
+                            </div>
+                        </div>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Rendering on the ETH Euler Cluster</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Dano Roost</li>
+                        </ol>
+                        <h2>Effect of the Feature</h2>
+                        <div class="row">
+                        <p>
+                            This feature enables us to perform  rendering on the ETH euler cluster.
+                            To enable this, we modify Nori to work without including the GUI features but only using command line interface. 
+                            For this, we add a build-option in CMake which can be activated when the application should be built without UI.
+                            To communicate with Euler, we use Visual Studio Code and the Remote-SSH extensions (<a href="https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh">link</a>) which allows to connect directly to the cluster without the struggles of using a pure command line 
+                            solution such as PuTTY. One important component of the whole approach is, that we save EXR-images every couple of seconds which can be viewed
+                            through VSCode to inspect the current progress (and one does not need to finish the render to see the result).
+                        </p>
+                        </div>
+                        <div class="row">
+                            <div class="col-xl-12">
+                                <img src="images/dano/euler/vscode-ssh.PNG" alt="Remote access using VSCode" class="img-fluid">
+                            </div>
+                        </div>
+                        <br/>
+                        <h2>Technical Implementation</h2>
+                        <p>
+                            To enable rendering without UI, we enable change the system in different places.
+                            <ul>
+                                <li>We add a flag <code>BUILD_WITH_UI</code> to the CMakeLists.txt to either include or exclude the nanogui dependency </li>
+                                <li>We add a class <code>nogui.cpp</code> which has similar functionality to <code>gui.cpp</code> but does not have a dependency on nanogui.<br/>
+                                Additionally, this class saves the current render result every 20 seconds to give a preview of the rendering process, and it prints out the current percentage of the render progress.</li>
+                            </ul>
+                            We can now build with the following command to create a version without UI (when the cwd is the build folder):<br/>
+                            <code>cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_WITH_UI=false ../cg-project-2022/nori/</code><br/><br/>
+                            New jobs can be run using the following command:<br/>
+                            <code>sbatch --ntasks=1 --cpus-per-task=16 --wrap="./nori ../cg-project-2022/nori/scenes/pa4/cbox/cbox_path_mis.xml"</code><br/>
+                            We would like to point out that this is where the number of CPUs can be defined of which Nori can take advantage.
+                        </p> 
+                        <br/>
+                        <h2>Validation</h2>
+                        <p>Renders can be performed on the Cluster which we see as validation enough. The resulting output of our renderer is written to the <code>slurm-&lt;job-id&gt;.out</code> file.</p>
+                        <div class="row">
+                            <div class="col-xl-12">
+                                <img src="images/dano/euler/vscode-result.PNG" alt="Remote access using VSCode" class="img-fluid">
+                            </div>
+                        </div>
+                        <br/>
+                        <h2>Code Coordinates</h2>
+                        <p>
+                            This feature touches the following files:
+                            <ul>
+                                <li>CMakeLists.txt (flag and logic to include or not include the nanogui dependency)</li>
+                                <li>nogui.cpp (initialization of the render process and progress reporting)</li>
+                                <li>main.cpp (based on the -DBUILD_WITH_UI-flag, we include or not include nanogui and either directly render the scene or show a UI.
+                                    This is mainly achieved using compiler-directives, i.e. <code>#if defined(WITH_UI) ... #endif</code>)</li>
+                            </ul>
+                            The details of what does what is explained above in <i>Technical Implementation</i>.
+                        </p>
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <div class="sb-sidenav-menu-heading">Images as Textures</div>
+                            <a class="nav-link" href="#implementation">Implementation</a>
+                            <a class="nav-link" href="#validation">Validation</a>
+                            <a class="nav-link" href="#additional_results">Validation - Additional Results</a>
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Images as Textures</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Jennifer Schürch</li>
+                        </ol>
+                        <p>This simple feature "5.3 Images as Textures" enables the user to replace constant albedo colors with arbitrary png-images to texture their objects in the scene. This is a great way to add detail and realism to the scene without having to physically model everything on the geometry level. </p>
+                        <div style="text-align: center;"><img style="width: 100%; max-width: 300px" src="images/jenny/iat/sphere-texture.png" alt="preview" class="img-responsive"></div>
+                        <br/><br/>
+                        <h2 id="implementation">Implementation</h2>
+                        <p>
+                            The basic structure of this class is the same as the checkerboard.cpp implementation. First, we need to be able to load the png image into Nori. For this, I used a preexisting png-loader called <a href="https://github.com/lvandeve/lodepng" target="_blank">lodepng</a>. Lodepng reads the image and saves the content into an unsigned char vector. One pixel is represented by a block of 4 chars with the respective <code>RGBA</code> values. This is implemented in the constructor of this class. Additionally, I added the ability to scale the texture with a simple 2D vector. I use the same convention as in Blender for the scaling, e.g., if the scale value is 2, the texture will be repeated twice for each axis.
+                        </p>
+                        <p>
+                            In the <code>eval</code> method, the uv coordinates are mapped to the image space. I assume that the uv coordinates are always scaled to [0,1]. We can simply calculate the image-u by multiplying uv.x() with the image width and the scaling term. Image-v is calculated analogously. After u and v have been mapped to the image space, we need to calculate the corresponding index in the image vector: <code>idx = (v * image_width + u) * 4</code>. The index is multiplied by 4 because each pixel consists of 4 chars (RGBA). To ensure the texture can be repeated, the index is mapped to the vector length by using the modulo operator: <code>idx = idx % image_size</code>. Finally, the obtained RGB values are divided by 255 to map them to [0,1]. The user can specify in the xml file, whether the values should be treated as raw, or whether the value should be transformed to RGB space by using <code>toLinearRGB()</code>.
+                        </p>
+                        <p>Usage:</p>
+                        <p><code>&#60;bsdf type="..."&#62; <br>
+                            &emsp;&#60;texture type="image_texture" name="albedo"&#62;<br>
+                            &emsp;&emsp;&#60;boolean name="raw" value="false"/&#62;<br>
+                            &emsp;&emsp;&#60;string name="filename" value="texture.png"/&#62;<br>
+                            &emsp;&emsp;&#60;vector name="scale" value="2,2"/&#62;<br>
+                            &emsp;&#60;/texture&#62;<br>
+                            &#60;/bsdf&#62;<br>
+                        </code></p>
+                        <p>The following files have been modified or added to implement this feature:</p>
+                        <ul>
+                            <li>include/nori/lodepng.h</li>
+                            <li>src/lodepng.cpp</li>
+                            <li>src/imagetexture.cpp</li>
+                        </ul>
+                        <h2 id="validation">Validation</h2>
+                        <p>
+                            To validate the textures, I simply rendered a numbered checkerboard pattern onto different objects and compared the results to the same scene rendered by Mitsuba and Blender. Using numbered checkerboard pattern also allows us to see whether the texture is mapped as expected. 
+                        </p>
+                        <p>The numbered checkerboard texture image is from <a href="https://www.artstation.com/blogs/zeeshannasir/peYz/reference-uv-map-grids" target="_blank">here</a> and the other image is our proposal concept: </p>
+                        <div class="row" >
+                            <img style="width: 100%; max-width: 300px" src="images/jenny/iat/Uvrefmap_checkeredmap.png" alt="Checkerboard" class="img-responsive"> 
+                            <img style="width: 100%; max-width: 300px" src="images/jenny/iat/concept.png" alt="Mine" class="img-responsive">
+                        </div>
+                        
+                        <br/><br/>
+                        <h3>Comparison to Mistuba</h3>
+                        <p>First, I'm going to show 2 comparisons with Mitsuba to show that the expected output is produced for the mapping and the colors. The only visible difference here is that Mitsuba's result seems to be a little sharper than mine. This is probably either due to differences in the integrator, or simply that Mitsuba includes more advanced methods such as mipmapping. However, the overall result looks correct. </p>
+                        <h4>Plane</h4>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/iat/numbered_checkerboard.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/iat/numbered_checkerboard_mitsuba.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <h4>Sphere</h4>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/iat/sphere-texture.png" alt="Mine" class="img-responsive">
+                                <img src="images/jenny/iat/sphere-texture-mitsuba.png" alt="Mitsuba" class="img-responsive">
+                            </div>
+                        </div>
+                        <br/><br/>
+                        <h3 id="additional_results">Additional Results</h3>
+                        <h4>Scale Effect</h4>
+                        <p>The effect of texture scaling is displayed in the comparison between non-scaled default texture map and the scaled version. </p>
+                        <ul>
+                            <li>uv-scale: (4, 2)</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/iat/numbered_checkerboard_scaled.png" alt="Scaled" class="img-responsive">
+                                <img src="images/jenny/iat/numbered_checkerboard_not_scaled.png" alt="Not Scaled" class="img-responsive">
+                            </div>
+                        </div>
+
+                        <h4>Raw vs linearRGB</h4>
+                        <p>Here I show the difference in vibrancy if we forget to convert the raw values from the PNG into the RGB space. Both results are rendered Nori.</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/jenny/iat/sphere-texture-raw.png" alt="Raw" class="img-responsive">
+                                <img src="images/jenny/iat/sphere-texture.png" alt="Linear RGB" class="img-responsive">
+                            </div>
+                        </div>
+
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>

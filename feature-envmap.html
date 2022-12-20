@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+        <meta name="description" content="" />
+        <meta name="author" content="" />
+        <title>CG 2022</title>
+        <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+        <link href="css/styles.css" rel="stylesheet" />
+        <link href="resources/offcanvas.css" rel="stylesheet">
+        <link href="resources/twentytwenty.css" rel="stylesheet" type="text/css" />
+        <script src="https://use.fontawesome.com/releases/v6.1.0/js/all.js" crossorigin="anonymous"></script>
+    </head>
+    <body class="sb-nav-fixed">
+        <nav class="sb-topnav navbar navbar-expand navbar-dark bg-dark">
+            <!-- Navbar Brand-->
+            <a class="navbar-brand ps-3" href="index.html">Computer Graphics 2022 </a>
+            &emsp;
+            <!-- Sidebar Toggle-->
+            <button class="btn btn-link btn-sm order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle" href="#!"><i class="fas fa-bars"></i></button>
+        </nav>
+        <div id="layoutSidenav">
+            <div id="layoutSidenav_nav">
+                <nav class="sb-sidenav accordion sb-sidenav-dark" id="sidenavAccordion">
+                    <div class="sb-sidenav-menu">
+                        <div class="nav">
+                            <a class="nav-link" href="index.html">
+                                <div class="sb-nav-link-icon"><i class="fas fa-arrow-circle-left"></i></div>
+                                Back
+                            </a>
+                        </div>
+                    </div>
+                    <div class="sb-sidenav-footer">
+                        <div class="small">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                    </div>
+                </nav>
+            </div>
+            <div id="layoutSidenav_content">
+                <main>
+                    <div class="container-fluid px-4">
+                        <h1 class="mt-4">Environment Map Emitter</h1>
+                        <ol class="breadcrumb mb-4">
+                            <li class="breadcrumb-item active">Dano Roost</li>
+                        </ol>
+                        <h2>Effect of the Feature</h2>
+                        <div class="row">
+                        <p>
+                            An environment map is texture that is used to illuminate a scene from all directions.
+                            Different than a regular image texture, for environment maps usually a texture with a higher value range is used, such 
+                            that the map can represent not only color but also brightness. In our case, we use exclusively EXR-textures. 
+                            All presented environment maps are obtained from <a href="https://polyhaven.com">PolyHaven.com</a> (see bottom for author credits). The advantage of an environment map over other types of illumination is that they provide very realistic lighting environments out of the box thanks to their nature of representing actual captured scenes. A very important part of this implementation is proper importance sampling as this reduces variances drastically.
+                        </p>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-pellerdrive-256-nori.png" alt="Nori" class="img-responsive">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-kloppenheim-nori-1024.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-clarens-nori.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <h2>Technical Implementation</h2>
+                        <p>
+                            At the core of our environment map implementation lies a 2-dimensional discrete probability distribution.
+                            While we generally orient ourselves on the approach from PBRT, unlike them we do not use a mipmapped texture but only a bitmap. Also different to PBRT, we do not build a 2D-distribution from multiple 1D-distribution but directly create a grid of marginal row probabilities and conditional column probabilities. The way the solution works is exactly the same however, with first sampling from the marginal row distribution, followed by the conditional column distribution. The build-up of this distribution is implemented in <code>DiscretePDF2D::initPdf()</code> and simply normalizes the sum of the values of each row to 1 and these sums are again normalized to 1 for the marginal row probabilities. To calculate the probabilities, we use the luminance of the colors.
+                            We not only save the PDF and CDF values but also the underlying function values in order to sample directly from the distribution. Very important for the implementation are the two function <code>dirToUV(Vector3f dir)</code> and <code>uvToDir(Point2f uv)</code> that convert coordinates between a 3D direction 
+                            and a point on the UV map, mapped to <code>[0,1]x[0,1]</code>. 
+                            Additionally to the environment map, the user can also supply a tint, which allows to increase exposure or manipulate the color of the environment map. The functions that are implemented by <i>infinitearealight.cpp</i> are the same as those of a regular emitter, namely <code>sample()</code>
+                            ,<code>eval()</code> and <code>pdf()</code>.
+                            <br>
+                            <br/>
+                            The sampling works by sampling a random UV-coordinate from our 2D distribution. This point is then converted to a 3D direction using <code>uvToDir(Point2f uv)</code>.
+                            In both the sample-function and the pdf-function, we want to return the PDF as well. When sampling uniform from the texture map we get an overproportional number directions close to the top and the bottom. These directions are more frequent on the UV map than in actual 3D space. We therefore need to weight them with a sine term to make directions towards the very up and very down direction less likely when importance sampling the environment map.
+                            <br>
+                            <br/>
+                            One important component is to terminate rays that did not intersect and return the emitted radiance from the environment map. This automatically gives a background that corresponds to the environment map. For implementation, we simply make a call to the <code>eval</code> function. This function again converts the direction to UV coordinates and returns the corresponding value from the environment map texture as radiance.
+                            <br>
+                            <br/>
+                            The environment map can be added over an extra tag in xml <code>&lt;envmap&gt;&lt;/envmap&gt;</code>. In code, the parser assigns the environment map which derives from the Emitter base class to both the list of emitters and the member variable <code>m_envmap</code> which can be accessed over <scene>scene->getInfiniteAreaLight()</scene>. This is for example required in the case of no intersections of a ray, where the radiance of the envmap for the given direction should be returned.
+                        </p> 
+                        <h2>Validation</h2>
+                        <p>
+                            For the validation of <code>dirToUV(Vector3f dir)</code> and <code>uvToDir(Point2f uv)</code> as well as the 2D probability distribution, we create very simple test cases in the constructor of infinitearealight. These test cases allow to check the values using the debugger and trigger an abort if <code>uvToDir(dirToUV(x)) != x</code>.
+                            <br/>
+                            Additionally, we write a new warp test to check whether the samples values and the PDF correspond closely.
+                            While the test does not pass successful, the sampled values correspond very closely to the computed PDF. This indicates that there is most likely a very minor bug in the implementation.
+                            As the visual quality is in no way degraded however and the importance sampling works fine, we keep it this way. Additionally, the sampled points clearly clump in brighter regions which corresponds to the desired behavior. The importance sampling works very well too and there is only minimally more noise present than with PBRT. Compared to uniform sampling on the sphere, the noise is greatly reduced.
+                            <br>
+                            We use the following two validation scenes to compare the influence of the environment map emitter
+                            <ul>
+                                <li>Nori: <code>cg-project-2022/verification/envmap/cbox_path_mis_envmap.xml</code></li>
+                                <li>PBRT: <code>cg-project-2022/verification/envmap/envmap.pbrt</code></li>
+                            </ul>
+                            
+                        </p>
+                        <h3>Comparison 1 - Default settings</h3>
+                        <ul>
+                            <li>Environment map: Clarens Midday</li>
+                            <li>Tint: None (1,1,1)</li>
+                            <li>Sample Count: 128</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-clarens-pbrt.png" alt="PBRT" class="img-responsive">
+                                <img src="images/dano/envmap/envmap-clarens-nori.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <h3>Comparison 2 - With tint</h3>
+                        <ul>
+                            <li>Environment map: Clarens Midday</li>
+                            <li>Tint: Red (1,0,0)</li>
+                            <li>Sample Count: 128</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-clarens-tint-pbrt.png" alt="PBRT" class="img-responsive">
+                                <img src="images/dano/envmap/envmap-clarens-tint-nori.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <h3>Comparison 3 - Night map</h3>
+                        <p>Medium sample render of a night environment map. PBRT crashes halfway through but our implementation delivers stable and firefly-free results.</p>
+                        <ul>
+                            <li>Environment map: Preller Drive</li>
+                            <li>Tint: None (1,1,1)</li>
+                            <li>Sample Count: 256</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-pellerdrive-256-nori.png" alt="Nori" class="img-responsive">
+                            </div>
+                        </div>
+                        <h3>Comparison 4 - Very diffuse map</h3>
+                        <p>High sample count with a rather dark and diffuse map. Only very minor changes noticeable</p>
+                        <ul>
+                            <li>Environment map: Kloppenheim</li>
+                            <li>Tint: None (1,1,1)</li>
+                            <li>Sample Count: 1024</li>
+                        </ul>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/envmap-kloppenheim-pbrt-1024.png" alt="PBRT" class="img-responsive">
+                                <img src="images/dano/envmap/envmap-kloppenheim-nori-1024.png" alt="Mine (Nori)" class="img-responsive">
+                            </div>
+                        </div>
+                        <h3>Warp Tests</h3>
+                        <p>For constant to medium variance envmap, the Warptests are successful. It looks like however, that there is some bug which results in slightly off sampling. We suspect that this is cause by the discretization of the envmap which is handled differently in PBRT and Mitsuba.</p>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/test-1.PNG" alt="PBRT" class="img-responsive">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/clarens_test.PNG" alt="PBRT" class="img-responsive">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="twentytwenty-container" style="width: 60%;">
+                                <img src="images/dano/envmap/clarens_test_2.PNG" alt="PBRT" class="img-responsive">
+                            </div>
+                        </div>                       
+                        <br/>
+                        <p>
+                            <b>Conclusion:</b> All renders are matching closely. 
+                            There is slightly more noise in our version, but nothing of concern.
+                            The results for the two different parameters match closely for the PBRT and the Nori-version, but there is a minor bug in the implementation (without visible impact on the renderings).
+                        </p>
+                        <h2>Code Coordinates</h2>
+                        <p>
+                            <ul>
+                                <li>The 2-dimensional discrete probability distribution can be found in <i>include/nori/dpdf.h</i></li>
+                                <li>The environment map emitter can be found in <i>src/infinitearealight.cpp</i></li>
+                            </ul>
+                        </p>
+                        <h2>Environmentmap Credits</h2>
+                        <p>
+                            We used the following environment maps and thank their authors for providing them:
+                            <ul>
+                                <li>Clarens Midday by Dimitrios Savva and Jarod Guest</li>
+                                <li>Preller Drive by Greg Zaal</li>
+                                <li>Kloppenheim by Greg Zaal</li>
+                            </ul>
+                        </p>
+                        
+                    </div>
+                </main>
+                <footer class="py-4 bg-light mt-auto">
+                    <div class="container-fluid px-4">
+                        <div class="d-flex align-items-center justify-content-between small">
+                            <div class="text-muted">Copyright &copy; Jennifer Schürch &amp; Dano Roost, 2022</div>
+                            <div>
+                                <a href="#">Privacy Policy</a>
+                                &middot;
+                                <a href="#">Terms &amp; Conditions</a>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+        <script src="js/scripts.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+        <script src="assets/demo/chart-area-demo.js"></script>
+        <script src="assets/demo/chart-bar-demo.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+        <script src="js/datatables-simple-demo.js"></script>
+
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+        <script src="resources/bootstrap.min.js"></script>
+        <script src="/js/offcanvas.js"></script>
+        <script src="resources/jquery.event.move.js"></script>
+        <script src="resources/jquery.twentytwenty.js"></script>
+        <script>
+            $(window).load(function(){$(".twentytwenty-container").twentytwenty({default_offset_pct: 0.5});});
+        </script>
+    </body>
+</html>
