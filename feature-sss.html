@@ -126,8 +126,8 @@
                             We evaluate the scene using different subsurface scattering settings. 
                             The validation scenes can be found under the following paths:
                             <ul>
-                                <li>Nori: <code>cg-project-2022/verification/dof/doftest/dof_testscene.xml</code></li>
-                                <li>PBRT: <code>cg-project-2022/verification/dof/doftest/dof_testscene.pbrt</code></li>
+                                <li>Nori: <code>cg-project-2022/nori/verification/dof/doftest/dof_testscene.xml</code></li>
+                                <li>PBRT: <code>cg-project-2022/nori/verification/dof/doftest/dof_testscene.pbrt</code></li>
                             </ul>
                             For performance reasons, the validation images are rendered with a resolution of only 512x512 pixel. For a high res version of the mesh, please refer to the image on top. 
                             We use 1024 samples per image.
@@ -209,21 +209,7 @@
                                 <li><code>bssrdf.h/bssrdf.cpp</code> Header and code file with interfaces for the lookup table (<code>BSSRDFTable</code>), the <code>BSSRDF</code> base class, the <code>SeparableBSSRDF</code> and the <code>TabulatedBSSRDF</code> which is a BSSRDF-implementation that allows to use a lookup table. Finally, this file contains the definition of <code>NoriBSSRDF</code> and <code>DirectionalSubsurface</code>. The first one is made for interfacing with the path tracing components and simply invokes the functionality offered by <code>TabulatedBSSRDF</code>. The second one is a BSDF can be sampled to get an incoming direction for the subsurface scattering.</li>
                                 <li><code>interpolation.h/interpolation.cpp</code> As described above, adapted from PBRT. This file implements Catmull-Rom interpolation to interpolate values in the lookup table.</li>
                                 <li><code>path_mis.cpp</code> To accommodate for the added subsurface scattering, we changed the structure of path_mis to re-use the BSDF- and emitter sampling in multiple places. This has a great impact of the structure.</li>
-                                <li><b>Other</b> We also add an additional flags to the <code>BSDFQueryRecord</code>, <code>isTransmission</code> and two flags to the <code>Emitter.h</code>, <code>isDiffuse</code> and <code>isSpecular</code>. While the <code>isSpecular</code> could also be evaluated over the <code>BSDFQueryRecord.measure</code> field, this is a bit of a cleaner way to do it.
-                                    <li></li>
-                                </li>
-                            </ul>
-		<float name="fov" value="27.7856"/>
-		<float name="apertureRadius" value="0.01"/>
-		<float name="focusDistance" value="5"/>
-		<transform name="toWorld">
-			<scale value="-1,1,1"/>
-			<lookat target="0, 0.893051, 4.41198" origin="0, 0.919769, 5.41159" up="0, 1, 0"/>
-		</transform>
-
-		<integer name="height" value="512"/>
-		<integer name="width" value="512"/>
-	</camera>
+                                <li><b>Other</b> We also add an additional flags to the <code>BSDFQueryRecord</code>, <code>isTransmission</code> and two flags to the <code>Emitter.h</code>, <code>isDiffuse</code> and <code>isSpecular</code>. While the <code>isSpecular</code> could also be evaluated over the <code>BSDFQueryRecord.measure</code> field, this is a bit of a cleaner way to do it.                  </li>
                             </ul>
                         </p>
                     </div>
